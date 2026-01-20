@@ -2,25 +2,31 @@
 
 ## Summary
 
-| Data Structure    | Type                                  | File                     |
-| ----------------- | ------------------------------------- | ------------------------ |
-| `jvp_array`       | Dynamic array (flexible array member) | `src/jv.c:822-826`       |
-| `jvp_string`      | Dynamic string (doubling strategy)    | `src/jv.c:1090-1098`     |
-| `jvp_object`      | Hash table (chained, flexible array)  | `src/jv.c:1572-1576`     |
-| `object_slot`     | Hash table slot (collision chain)     | `src/jv.c:1565-1570`     |
-| `struct stack`    | Execution stack (doubling strategy)   | `src/exec_stack.h:50-54` |
-| `struct inst`     | Doubly-linked list (IR nodes)         | `src/compile.c:23-65`    |
-| `block`           | Linked list container (first/last)    | `src/compile.h:12-15`    |
-| `jv_parser`       | Parser state (dynamic arrays)         | `src/jv_parse.c:33-66`   |
-| `struct bytecode` | Bytecode container (dynamic arrays)   | `src/bytecode.h:72-88`   |
-| `struct locfile`  | Source file tracker (dynamic linemap) | `src/locfile.h:12-21`    |
-| `jv_refcnt`       | Reference counter                     | `src/jv.c:53-55`         |
+### Layer 1: Primitive Data Structures
+
+| Data Structure | Type                                  | File                     |
+| -------------- | ------------------------------------- | ------------------------ |
+| `jvp_array`    | Dynamic array (flexible array member) | `src/jv.c:822-826`       |
+| `jvp_string`   | Dynamic string (doubling strategy)    | `src/jv.c:1090-1098`     |
+| `jvp_object`   | Hash table (chained, flexible array)  | `src/jv.c:1572-1576`     |
+| `struct stack` | Execution stack (doubling strategy)   | `src/exec_stack.h:50-54` |
+
+### Layer 2: Composite Data Structures
+
+| Data Structure     | Type                          | File                   |
+| ------------------ | ----------------------------- | ---------------------- |
+| `struct jq_state`  | Interpreter state             | `src/execute.c:22-54`  |
+| `struct jv_parser` | JSON parser (internal arrays) | `src/jv_parse.c:33-66` |
+| `struct inst`      | Doubly-linked list (IR nodes) | `src/compile.c:23-65`  |
+| `struct bytecode`  | Compiled bytecode container   | `src/bytecode.h:72-88` |
+| `struct locfile`   | Source location tracker       | `src/locfile.h:12-21`  |
 
 ---
 
-## Dynamic Array
+# Layer 1: Primitive Data Structures
 
-Core Array Struct (jvp_array)
+## `jvp_array` - Dynamic Array
+
 File: `repos/jq/src/jv.c:822-826`
 
 ```c
@@ -31,47 +37,18 @@ typedef struct {
 } jvp_array;
 ```
 
-Array Reallocation
-File: `repos/jq/src/jv.c:878-909`
+A reference-counted dynamic array using a flexible array member. Stores JSON values (`jv`) and grows via reallocation when capacity is exceeded. The `refcnt` enables copy-on-write semantics - arrays are only copied when modified while shared.
 
-```c
-static jv* jvp_array_write(jv* a, int i) {
-  assert(i >= 0);
-  jvp_array* array = jvp_array_ptr(*a);
-
-  int pos = i + jvp_array_offset(*a);
-  if (pos < array->alloc_length && jvp_refcnt_unshared(a->u.ptr)) {
-    // use existing array space
-    for (int j = array->length; j <= pos; j++) {
-      array->elements[j] = JV_NULL;
-    }
-    array->length = imax(pos + 1, array->length);
-    a->size = imax(i + 1, a->size);
-    return &array->elements[pos];
-  } else {
-    // allocate a new array
-    int new_length = imax(i + 1, jvp_array_length(*a));
-    jvp_array* new_array = jvp_array_alloc(ARRAY_SIZE_ROUND_UP(new_length));
-    int j;
-    for (j = 0; j < jvp_array_length(*a); j++) {
-      new_array->elements[j] =
-        jv_copy(array->elements[j + jvp_array_offset(*a)]);
-    }
-    for (; j < new_length; j++) {
-      new_array->elements[j] = JV_NULL;
-    }
-    new_array->length = new_length;
-    jvp_array_free(*a);
-    jv new_jv = {JVP_FLAGS_ARRAY, 0, 0, new_length, {&new_array->refcnt}};
-    *a = new_jv;
-    return &new_array->elements[i];
-  }
+```rust
+struct JvpArray {
+    refcnt: Rc<RefCell<Vec<Jv>>>,
 }
 ```
 
-## Dynamic String
+---
 
-Dynamic String Struct (jvp_string)
+## `jvp_string` - Dynamic String
+
 File: `repos/jq/src/jv.c:1090-1098`
 
 ```c
@@ -84,55 +61,33 @@ typedef struct {
 } jvp_string;
 ```
 
-String Reallocation (Doubling Strategy)
-File: `repos/jq/src/jv.c:1174-1198`
+A reference-counted dynamic string with cached hash value. The `length_hashed` field packs both the string length and a "hash computed" flag into a single value (length in upper bits). Uses doubling growth strategy on append with a minimum allocation of 32 bytes.
 
-```c
-static jv jvp_string_append(jv string, const char* data, uint32_t len) {
-  jvp_string* s = jvp_string_ptr(string);
-  uint32_t currlen = jvp_string_length(s);
+```rust
+struct JvpString {
+    refcnt: Rc<RefCell<StringInner>>,
+}
 
-  if (jvp_refcnt_unshared(string.u.ptr) &&
-      jvp_string_remaining_space(s) >= len) {
-    // the next string fits at the end of a
-    memcpy(s->data + currlen, data, len);
-    s->data[currlen + len] = 0;
-    s->length_hashed = (currlen + len) << 1;
-    return string;
-  } else {
-    // allocate a bigger buffer and copy
-    uint32_t allocsz = (currlen + len) * 2;
-    if (allocsz < 32) allocsz = 32;
-    jvp_string* news = jvp_string_alloc(allocsz);
-    news->length_hashed = (currlen + len) << 1;
-    memcpy(news->data, s->data, currlen);
-    memcpy(news->data + currlen, data, len);
-    news->data[currlen + len] = 0;
-    jvp_string_free(string);
-    jv r = {JVP_FLAGS_STRING, 0, 0, 0, {&news->refcnt}};
-    return r;
-  }
+struct StringInner {
+    hash: Option<u32>,
+    data: String,
 }
 ```
 
-## Hash Table
+---
 
-Object Slot Struct (object_slot)
-File: `repos/jq/src/jv.c:1565-1570`
+## `jvp_object` - Hash Table
+
+File: `repos/jq/src/jv.c:1565-1576`
 
 ```c
 struct object_slot {
-  int next; /* next slot with same hash, for collisions */
+  int next;
   uint32_t hash;
   jv string;
   jv value;
 };
-```
 
-Hash Table Struct (jvp_object)
-File: `repos/jq/src/jv.c:1572-1576`
-
-```c
 typedef struct {
   jv_refcnt refcnt;
   int next_free;
@@ -140,9 +95,18 @@ typedef struct {
 } jvp_object;
 ```
 
-## Stack
+A reference-counted hash table using chained collision resolution. Each slot stores a key-value pair plus a `next` index for collision chains. The `next_free` field tracks the next available slot in the flexible array. Keys are always strings; values are any `jv` type.
 
-Stack Struct (struct stack)
+```rust
+struct JvpObject {
+    refcnt: Rc<RefCell<HashMap<String, Jv>>>,
+}
+```
+
+---
+
+## `struct stack` - Execution Stack
+
 File: `repos/jq/src/exec_stack.h:50-54`
 
 ```c
@@ -153,27 +117,135 @@ struct stack {
 };
 ```
 
-Stack Reallocation (Doubling Strategy)
-File: `repos/jq/src/exec_stack.h:83-93`
+A growable byte-addressable stack that grows downward in memory. Used by the jq virtual machine to store stack frames and local variables. The stack is addressed via negative offsets from `mem_end`. Reallocates with doubling strategy when space is exhausted.
 
-```c
-static void stack_reallocate(struct stack* s, size_t sz) {
-  int old_mem_length = -(s->bound) + ALIGNMENT;
-  char* old_mem_start = (s->mem_end != NULL) ? (s->mem_end - old_mem_length) : NULL;
-
-  int new_mem_length = align_round_up((old_mem_length + sz + 256) * 2);
-  char* new_mem_start = jv_mem_realloc(old_mem_start, new_mem_length);
-  memmove(new_mem_start + (new_mem_length - old_mem_length),
-            new_mem_start, old_mem_length);
-  s->mem_end = new_mem_start + new_mem_length;
-  s->bound = -(new_mem_length - ALIGNMENT);
+```rust
+struct Stack {
+    memory: Vec<u8>,
+    top: usize,
 }
 ```
 
-## Doubly-Linked List (IR)
+---
 
-Instruction Node Struct (struct inst)
-File: `repos/jq/src/compile.c:23-65`
+# Layer 2: Composite Data Structures
+
+## `struct jq_state` - Interpreter State
+
+File: `repos/jq/src/execute.c:22-54`
+
+```c
+struct jq_state {
+  jq_msg_cb err_cb;
+  void *err_cb_data;
+  jv error;
+
+  struct stack stk;
+  stack_ptr curr_frame;
+  stack_ptr stk_top;
+  stack_ptr fork_top;
+
+  jv path;
+  int subexp_nest;
+  int debug_trace_enabled;
+  int initial_execution;
+  unsigned next_label;
+
+  int halted;
+  jv exit_code;
+  jv error_message;
+
+  struct bytecode* bc;
+
+  jq_input_cb input_cb;
+  void *input_cb_data;
+  jq_msg_cb debug_cb;
+  void *debug_cb_data;
+  jq_msg_cb stderr_cb;
+  void *stderr_cb_data;
+
+  struct jv_parser *parser;
+  jv attrs;
+};
+```
+
+The main interpreter state container. Holds the execution stack, current bytecode, error handling callbacks, and I/O callbacks. Manages the virtual machine's runtime state including fork points for backtracking and debug/trace settings.
+
+```rust
+struct JqState {
+    error: Option<Jv>,
+    stack: Stack,
+    curr_frame: usize,
+    path: Jv,
+    halted: bool,
+    exit_code: Jv,
+    bytecode: Rc<Bytecode>,
+    parser: Option<JvParser>,
+    attrs: Jv,
+    // callbacks omitted - would use trait objects or closures
+}
+```
+
+---
+
+## `struct jv_parser` - JSON Parser
+
+File: `repos/jq/src/jv_parse.c:33-66`
+
+```c
+struct jv_parser {
+  const char* curr_buf;
+  int curr_buf_length;
+  int curr_buf_pos;
+  int eof;
+
+  int flags;
+
+  jv* stack;
+  int stackpos;
+  int stacklen;
+  jv path;
+  jv output;
+  jv next;
+
+  char* tokenbuf;
+  int tokenpos;
+  int tokenlen;
+
+  int line, column;
+
+  enum {
+    JV_PARSER_NORMAL,
+    JV_PARSER_STRING,
+    JV_PARSER_STRING_ESCAPE,
+    JV_PARSER_WAITING_FOR_RS
+  } st;
+};
+```
+
+A streaming JSON parser with internal dynamic arrays for nested value construction. The `stack` array tracks nested objects/arrays being parsed. The `tokenbuf` accumulates characters for string/number tokens. Supports incremental parsing of partial input.
+
+```rust
+struct JvParser {
+    curr_buf: Vec<u8>,
+    pos: usize,
+    eof: bool,
+    flags: ParserFlags,
+    stack: Vec<Jv>,
+    path: Jv,
+    output: Option<Jv>,
+    tokenbuf: String,
+    line: usize,
+    column: usize,
+    state: ParserState,
+}
+```
+
+---
+
+## `struct inst` / `block` - IR Linked List
+
+File: `repos/jq/src/compile.c:23-65`, `repos/jq/src/compile.h:12-15`
 
 ```c
 struct inst {
@@ -192,118 +264,49 @@ struct inst {
   struct locfile* locfile;
   location source;
 
-  // Binding
   struct inst* bound_by;
   char* symbol;
-  int any_unbound;
-  int referenced;
 
   int nformals;
   int nactuals;
 
-  block subfn;   // used by CLOSURE_CREATE (body of function)
-  block arglist; // used by CLOSURE_CREATE (formals) and CALL_JQ (arguments)
+  block subfn;
+  block arglist;
 
-  // This instruction is compiled as part of which function?
   struct bytecode* compiled;
-
-  int bytecode_pos; // position just after this insn
+  int bytecode_pos;
 };
-```
 
-Block Container Struct (block)
-File: `repos/jq/src/compile.h:12-15`
-
-```c
 typedef struct block {
   inst* first;
   inst* last;
 } block;
 ```
 
-Node Allocation
-File: `repos/jq/src/compile.c:67-83`
+A doubly-linked list of intermediate representation instructions. Each `inst` node represents one IR operation with optional immediate values (constants, jump targets, C function pointers). The `block` struct provides O(1) access to both ends for efficient concatenation during compilation.
 
-```c
-static inst* inst_new(opcode op) {
-  inst* i = jv_mem_alloc(sizeof(inst));
-  i->next = i->prev = 0;
-  i->op = op;
-  i->bytecode_pos = -1;
-  i->bound_by = 0;
-  i->symbol = 0;
-  i->any_unbound = 0;
-  i->referenced = 0;
-  i->nformals = -1;
-  i->nactuals = -1;
-  i->subfn = gen_noop();
-  i->arglist = gen_noop();
-  i->source = UNKNOWN_LOCATION;
-  i->locfile = 0;
-  return i;
+```rust
+struct Inst {
+    op: Opcode,
+    imm: Immediate,
+    source: Location,
+    bound_by: Option<Weak<Inst>>,
+    symbol: Option<String>,
+    nformals: i32,
+    nactuals: i32,
+    subfn: Block,
+    arglist: Block,
+}
+
+struct Block {
+    instructions: VecDeque<Rc<Inst>>,
 }
 ```
 
-## Parser State
+---
 
-Parser Struct (jv_parser)
-File: `repos/jq/src/jv_parse.c:33-66`
+## `struct bytecode` - Compiled Bytecode
 
-```c
-struct jv_parser {
-  const char* curr_buf;
-  int curr_buf_length;
-  int curr_buf_pos;
-  int curr_buf_is_partial;
-  int eof;
-  unsigned bom_strip_position;
-
-  int flags;
-
-  jv* stack;                   // dynamic array
-  int stackpos;
-  int stacklen;
-  jv path;
-  enum last_seen last_seen;
-  jv output;
-  jv next;
-
-  char* tokenbuf;              // dynamic buffer
-  int tokenpos;
-  int tokenlen;
-
-  int line, column;
-
-  struct dtoa_context dtoa;
-
-  enum {
-    JV_PARSER_NORMAL,
-    JV_PARSER_STRING,
-    JV_PARSER_STRING_ESCAPE,
-    JV_PARSER_WAITING_FOR_RS
-  } st;
-  unsigned int last_ch_was_ws:1;
-};
-```
-
-Parser Stack Push (Doubling + 10 Strategy)
-File: `repos/jq/src/jv_parse.c:146-154`
-
-```c
-static void push(struct jv_parser* p, jv v) {
-  assert(p->stackpos <= p->stacklen);
-  if (p->stackpos == p->stacklen) {
-    p->stacklen = p->stacklen * 2 + 10;
-    p->stack = jv_mem_realloc(p->stack, p->stacklen * sizeof(jv));
-  }
-  assert(p->stackpos < p->stacklen);
-  p->stack[p->stackpos++] = v;
-}
-```
-
-## Bytecode Container
-
-Bytecode Struct (struct bytecode)
 File: `repos/jq/src/bytecode.h:72-88`
 
 ```c
@@ -314,7 +317,7 @@ struct bytecode {
   int nlocals;
   int nclosures;
 
-  jv constants; // JSON array of constants
+  jv constants;
   struct symbol_table* globals;
 
   struct bytecode** subfunctions;
@@ -326,9 +329,25 @@ struct bytecode {
 };
 ```
 
-## Source Location Tracker
+Container for compiled jq bytecode. Holds the instruction stream (`code`), a constant pool (`constants` as a jv array), and nested subfunctions for closures. The `parent` pointer links to the enclosing function's bytecode for lexical scoping.
 
-Location File Struct (struct locfile)
+```rust
+struct Bytecode {
+    code: Vec<u16>,
+    nlocals: i32,
+    nclosures: i32,
+    constants: Jv,
+    globals: Rc<SymbolTable>,
+    subfunctions: Vec<Rc<Bytecode>>,
+    parent: Option<Weak<Bytecode>>,
+    debuginfo: Jv,
+}
+```
+
+---
+
+## `struct locfile` - Source Location Tracker
+
 File: `repos/jq/src/locfile.h:12-21`
 
 ```c
@@ -336,7 +355,7 @@ struct locfile {
   jv fname;
   const char* data;
   int length;
-  int* linemap;   // dynamic array for line positions
+  int* linemap;
   int nlines;
   char *error;
   jq_state *jq;
@@ -344,32 +363,13 @@ struct locfile {
 };
 ```
 
-## Reference Counter
+Tracks source file content and line positions for error reporting. The `linemap` dynamic array stores byte offsets where each line begins, enabling O(1) line number lookup from byte position. Reference-counted to allow sharing across compilation units.
 
-Reference Count Struct (jv_refcnt)
-File: `repos/jq/src/jv.c:53-55`
-
-```c
-typedef struct jv_refcnt {
-  int count;
-} jv_refcnt;
-```
-
-Reference Count Operations
-File: `repos/jq/src/jv.c:59-71`
-
-```c
-static void jvp_refcnt_inc(jv_refcnt* c) {
-  c->count++;
-}
-
-static int jvp_refcnt_dec(jv_refcnt* c) {
-  c->count--;
-  return c->count == 0;
-}
-
-static int jvp_refcnt_unshared(jv_refcnt* c) {
-  assert(c->count > 0);
-  return c->count == 1;
+```rust
+struct Locfile {
+    fname: String,
+    data: String,
+    linemap: Vec<usize>,
+    error: Option<String>,
 }
 ```
