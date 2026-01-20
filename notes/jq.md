@@ -2,19 +2,19 @@
 
 ## Summary
 
-| Data Structure | Type | File |
-|---|---|---|
-| `jvp_array` | Dynamic array (flexible array member) | `src/jv.c:822-826` |
-| `jvp_string` | Dynamic string (doubling strategy) | `src/jv.c:1090-1098` |
-| `jvp_object` | Hash table (chained, flexible array) | `src/jv.c:1572-1576` |
-| `object_slot` | Hash table slot (collision chain) | `src/jv.c:1565-1570` |
-| `struct stack` | Execution stack (doubling strategy) | `src/exec_stack.h:50-54` |
-| `struct inst` | Doubly-linked list (IR nodes) | `src/compile.c:23-65` |
-| `block` | Linked list container (first/last) | `src/compile.h:12-15` |
-| `jv_parser` | Parser state (dynamic arrays) | `src/jv_parse.c:33-66` |
-| `struct bytecode` | Bytecode container (dynamic arrays) | `src/bytecode.h:72-88` |
-| `struct locfile` | Source file tracker (dynamic linemap) | `src/locfile.h:12-21` |
-| `jv_refcnt` | Reference counter | `src/jv.c:53-55` |
+| Data Structure    | Type                                  | File                     |
+| ----------------- | ------------------------------------- | ------------------------ |
+| `jvp_array`       | Dynamic array (flexible array member) | `src/jv.c:822-826`       |
+| `jvp_string`      | Dynamic string (doubling strategy)    | `src/jv.c:1090-1098`     |
+| `jvp_object`      | Hash table (chained, flexible array)  | `src/jv.c:1572-1576`     |
+| `object_slot`     | Hash table slot (collision chain)     | `src/jv.c:1565-1570`     |
+| `struct stack`    | Execution stack (doubling strategy)   | `src/exec_stack.h:50-54` |
+| `struct inst`     | Doubly-linked list (IR nodes)         | `src/compile.c:23-65`    |
+| `block`           | Linked list container (first/last)    | `src/compile.h:12-15`    |
+| `jv_parser`       | Parser state (dynamic arrays)         | `src/jv_parse.c:33-66`   |
+| `struct bytecode` | Bytecode container (dynamic arrays)   | `src/bytecode.h:72-88`   |
+| `struct locfile`  | Source file tracker (dynamic linemap) | `src/locfile.h:12-21`    |
+| `jv_refcnt`       | Reference counter                     | `src/jv.c:53-55`         |
 
 ---
 

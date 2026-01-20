@@ -2,20 +2,20 @@
 
 ## Summary
 
-| Data Structure | Type | File |
-|---|---|---|
-| `Curl_llist` | Doubly-linked list | `lib/llist.h:33-41` |
-| `Curl_llist_node` | Linked list node | `lib/llist.h:43-51` |
-| `dynbuf` | Dynamic string (doubling strategy) | `lib/curlx/dynbuf.h:27-35` |
-| `Curl_hash` | Hash table (string keys, chained) | `lib/hash.h:53-67` |
-| `Curl_hash_element` | Hash table element | `lib/hash.h:45-51` |
-| `bufq` | Buffer queue (chunked, pooled) | `lib/bufq.h:92-101` |
-| `buf_chunk` | Buffer chunk | `lib/bufq.h:33-42` |
-| `bufc_pool` | Chunk pool | `lib/bufq.h:51-56` |
-| `uint_hash` | Hash table (uint32 keys) | `lib/uint-hash.h:33-41` |
-| `uint32_tbl` | Dynamic table (sparse array) | `lib/uint-table.h:31-40` |
-| `uint32_bset` | Dense bitset | `lib/uint-bset.h:40-47` |
-| `uint32_spbset` | Sparse bitset (linked chunks) | `lib/uint-spbset.h:48-53` |
+| Data Structure      | Type                               | File                       |
+| ------------------- | ---------------------------------- | -------------------------- |
+| `Curl_llist`        | Doubly-linked list                 | `lib/llist.h:33-41`        |
+| `Curl_llist_node`   | Linked list node                   | `lib/llist.h:43-51`        |
+| `dynbuf`            | Dynamic string (doubling strategy) | `lib/curlx/dynbuf.h:27-35` |
+| `Curl_hash`         | Hash table (string keys, chained)  | `lib/hash.h:53-67`         |
+| `Curl_hash_element` | Hash table element                 | `lib/hash.h:45-51`         |
+| `bufq`              | Buffer queue (chunked, pooled)     | `lib/bufq.h:92-101`        |
+| `buf_chunk`         | Buffer chunk                       | `lib/bufq.h:33-42`         |
+| `bufc_pool`         | Chunk pool                         | `lib/bufq.h:51-56`         |
+| `uint_hash`         | Hash table (uint32 keys)           | `lib/uint-hash.h:33-41`    |
+| `uint32_tbl`        | Dynamic table (sparse array)       | `lib/uint-table.h:31-40`   |
+| `uint32_bset`       | Dense bitset                       | `lib/uint-bset.h:40-47`    |
+| `uint32_spbset`     | Sparse bitset (linked chunks)      | `lib/uint-spbset.h:48-53`  |
 
 ---
 
