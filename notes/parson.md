@@ -2,10 +2,10 @@
 
 ## Summary
 
-| Data Structure  | Type                                  | File               |
-| --------------- | ------------------------------------- | ------------------ |
-| `json_array_t`  | Dynamic array (malloc+memcpy+free)    | `parson.c:144-149` |
-| `json_object_t` | Hash table with dynamic arrays        | `parson.c:132-142` |
+| Data Structure  | Type                               | File               |
+| --------------- | ---------------------------------- | ------------------ |
+| `json_array_t`  | Dynamic array (malloc+memcpy+free) | `parson.c:144-149` |
+| `json_object_t` | Hash table with dynamic arrays     | `parson.c:132-142` |
 
 Note: Parson uses `malloc+memcpy+free` instead of `realloc` for capacity growth.
 

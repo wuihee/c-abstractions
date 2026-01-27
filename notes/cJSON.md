@@ -2,16 +2,16 @@
 
 ## Summary
 
-| Data Structure | Type                               | File                   |
-| -------------- | ---------------------------------- | ---------------------- |
-| `printbuffer`  | Dynamic string (doubling strategy) | `cJSON.c:473-482`      |
+| Data Structure | Type                               | File              |
+| -------------- | ---------------------------------- | ----------------- |
+| `printbuffer`  | Dynamic string (doubling strategy) | `cJSON.c:473-482` |
 
 ### Non-Qualifying Data Structures
 
-| Data Structure   | Type                    | File                | Why Excluded                    |
-| ---------------- | ----------------------- | ------------------- | ------------------------------- |
-| `cJSON`          | JSON tree node          | `cJSON.h:103-123`   | Linked list, no capacity growth |
-| `internal_hooks` | Allocator function ptrs | `cJSON.c:156-161`   | No dynamic behavior             |
+| Data Structure   | Type                    | File              | Why Excluded                    |
+| ---------------- | ----------------------- | ----------------- | ------------------------------- |
+| `cJSON`          | JSON tree node          | `cJSON.h:103-123` | Linked list, no capacity growth |
+| `internal_hooks` | Allocator function ptrs | `cJSON.c:156-161` | No dynamic behavior             |
 
 ---
 

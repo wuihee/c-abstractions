@@ -6,12 +6,12 @@
 
 ### Data Structures Present (Non-Qualifying)
 
-| Data Structure | Type                      | File                  | Why Excluded                         |
-| -------------- | ------------------------- | --------------------- | ------------------------------------ |
-| `te_expr`      | Expression tree node      | `tinyexpr.h:36-40`    | Flexible array member, no growth     |
-| `te_variable`  | Variable binding          | `tinyexpr.h:55-60`    | Simple struct, no dynamic behavior   |
-| `state`        | Parser state              | `tinyexpr.c:66-75`    | No capacity tracking, no growth      |
-| `functions`    | Built-in function table   | `tinyexpr.c:162-193`  | Static const array                   |
+| Data Structure | Type                    | File                 | Why Excluded                       |
+| -------------- | ----------------------- | -------------------- | ---------------------------------- |
+| `te_expr`      | Expression tree node    | `tinyexpr.h:36-40`   | Flexible array member, no growth   |
+| `te_variable`  | Variable binding        | `tinyexpr.h:55-60`   | Simple struct, no dynamic behavior |
+| `state`        | Parser state            | `tinyexpr.c:66-75`   | No capacity tracking, no growth    |
+| `functions`    | Built-in function table | `tinyexpr.c:162-193` | Static const array                 |
 
 ---
 
@@ -90,6 +90,7 @@ Parser state for the recursive descent parser. The `lookup` pointer references u
 ## Architecture Notes
 
 TinyExpr parses expressions into a tree of `te_expr` nodes, where each node represents either:
+
 - A constant value
 - A variable reference
 - A function call with 0-7 parameters
