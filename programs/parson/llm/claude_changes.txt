@@ -1,0 +1,22 @@
+Struct changes:
+
+- json_object_t: Replaced 7 fields (cells, hashes, names, values, cell_ixs, count, item/cell_capacity) with a single JSON_Object_Pair \*pairs (stb_ds string hash map)
+- json_array_t: Replaced items/count/capacity with a single JSON_Value \*\*items (stb_ds dynamic array)
+- Added JSON_Object_Pair typedef with key/value fields
+
+Removed functions (replaced by stb_ds internals):
+
+- hash_string(), json_object_init(), json_object_deinit(), json_object_grow_and_rehash(), json_object_get_cell_ix(), json_array_resize()
+- Removed OBJECT_INVALID_IX, STARTING_CAPACITY, and MAX macros
+
+Rewritten functions (using stb_ds macros):
+
+- json_object_make — uses sh_new_strdup
+- json_object_add — uses shgeti/shput
+- json_object_getn_value — uses stack buffer + shgetp_null
+- json_object_remove_internal — uses shgeti/shdel
+- json_object_free — iterates pairs, then shfree
+- json_object_set_value — uses shgeti/shput
+- json_object_clear — shfree + re-init
+- json_object_get_count/get_name/get_value_at — uses shlenu/direct indexing
+- json_array_make/add/free/remove/clear/get_count — uses arrput/arrdel/arrfree/arrlenu
