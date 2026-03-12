@@ -27,6 +27,14 @@ We have three options for transforming data structures:
 2. Remove existing interfaces and use data structures inline.
 3. Write our own interfaces.
 
+### LLM
+
+Transform dynamic arrays using an LLM. The model used is Claude Opus 4.5 and the prompt used is:
+
+```text
+Replace all instances of hand-rolled dynamic arrays in programs/<program_name>/llm with those provided by stb_ds.h
+```
+
 ## TODOs
 
 - Inline then interface transformation for `parson`.
