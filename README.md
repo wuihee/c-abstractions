@@ -37,5 +37,5 @@ Replace all instances of hand-rolled dynamic arrays in programs/<program_name>/l
 
 ## TODOs
 
-- Inline then interface transformation for `parson`.
+- LLMs created its own interface for `inih`; Prompt LLM to not create its own interface.
 - Transform mpc.
