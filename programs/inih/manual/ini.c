@@ -22,6 +22,9 @@ https://github.com/benhoyt/inih
 
 #include "ini.h"
 
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
+
 #if !INI_USE_STACK
 #if INI_CUSTOM_ALLOCATOR
 #include <stddef.h>
@@ -140,6 +143,11 @@ int ini_parse_stream(ini_reader reader, void *stream, ini_handler handler,
   while (reader(line, (int)max_line, stream) != NULL) {
     offset = strlen(line);
 
+    // Dynamic array reallocation here!
+    // 1. Remove reallocation logic and replace adding to array with stbds API.
+    // 2. Use reallocation API provided by stbds API.
+    //
+    // I also need to find out where array growth is happening.
 #if INI_ALLOW_REALLOC && !INI_USE_STACK
     while (max_line < INI_MAX_LINE && offset == max_line - 1 &&
            line[offset - 1] != '\n') {
